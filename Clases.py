@@ -25,5 +25,5 @@ class Proceso:
 #Clase para la CPU       
 class CPU:
     def __init__(self,proceso):
-        proceso.estado = ESTADO_EJECUCION
-        self.proceso = proceso 
+        self.proceso = None 
+

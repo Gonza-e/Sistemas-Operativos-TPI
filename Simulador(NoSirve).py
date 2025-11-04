@@ -1,0 +1,208 @@
+from Clases import Particion, Planificador, Proceso, CPU, Memoria, SUSPENDIDO, LISTO, EJECUCION, NUEVO, TERMINADO
+from tabulate import tabulate
+
+class Simulador:
+    def __init__(self):
+        self.memoria = Memoria()
+        self.cpu = CPU()
+        self.planificador = Planificador()
+        self.procesos_terminados = []
+        self.todos_los_procesos = []
+        self.grado_multiprogramacion = 5
+
+    def cargarProcesos(self, procesos):
+        self.todos_los_procesos = sorted(procesos, key=lambda p: p.t_arribo)
+        print(f"\n✅ {len(procesos)} procesos cargados correctamente.")
+
+    def ejecutar(self):
+        tiempo_actual = 0
+        procesos_en_espera = self.todos_los_procesos.copy()
+        print("\n🚀 INICIO DE LA SIMULACIÓN\n")
+
+        while True:
+            # Recalcular cuántos procesos activos hay
+            activos = len([x for x in self.todos_los_procesos if x.estado not in (TERMINADO, NUEVO)])
+            
+            # Si ya no hay procesos en ejecución, listos, suspendidos ni por llegar → fin
+            if (not procesos_en_espera and 
+                not self.planificador.cola_de_listos and
+                not self.planificador.cola_de_suspendidos and
+                not self.cpu.proceso):
+                print("\n✅ SIMULACIÓN FINALIZADA.")
+                self.mostrar_informe_final(tiempo_actual)
+                break
+
+            # 1️⃣ Llegan procesos en este instante
+            llegaron = [p for p in procesos_en_espera if p.t_arribo == tiempo_actual]
+            for p in list(llegaron):
+                procesos_en_espera.remove(p)
+                if activos >= self.grado_multiprogramacion:
+                    p.estado = SUSPENDIDO
+                    self.planificador.cola_de_suspendidos.append(p)
+                    print(f"🚫 t={tiempo_actual}: P{p.id} suspendido (GM={activos}/{self.grado_multiprogramacion})")
+                else:
+                    p.estado = NUEVO
+                    print(f"\n🕐 t={tiempo_actual}: Proceso {p.id} arriba (tamaño={p.tamaño}K, irrupción={p.t_irrupcion})")
+                    asignado = self.memoria.asignarProceso(p)
+                    if asignado:
+                        if not self.cpu.proceso:
+                            self.cpu.proceso = p
+                            p.estado = EJECUCION
+                            print(f"⚙️ CPU toma P{p.id} (sin expropiación).")
+                        else:
+                            if p.t_irrupcion < self.cpu.proceso.t_irrupcion_faltante:
+                                print(f"⚠️ Expropiación inmediata: P{p.id} ({p.t_irrupcion}) < P{self.cpu.proceso.id} restante ({self.cpu.proceso.t_irrupcion_faltante})")
+                                self.cpu.proceso.estado = LISTO
+                                self.planificador.agregarProceso(self.cpu.proceso)
+                                p.estado = EJECUCION
+                                self.cpu.proceso = p
+                            else:
+                                p.estado = LISTO
+                                self.planificador.agregarProceso(p)
+                                print(f"🟢 Proceso {p.id} cargado en memoria y listo para ejecutar.")
+                    else:
+                        p.estado = SUSPENDIDO
+                        self.planificador.cola_de_suspendidos.append(p)
+                        print(f"💤 Proceso {p.id} suspendido (sin espacio en memoria).")
+
+                self.mostrar_estado(tiempo_actual)
+                input("\n⏸️ Presione ENTER para continuar...\n")
+                activos = len([x for x in self.todos_los_procesos if x.estado not in (TERMINADO, NUEVO)])
+
+            # 2️⃣ Reactivar suspendidos si hay espacio y GM < 5
+            for ps in list(self.planificador.cola_de_suspendidos):
+                activos = len([x for x in self.todos_los_procesos if x.estado not in (TERMINADO, NUEVO)])
+                if activos < self.grado_multiprogramacion:
+                    asignado = self.memoria.asignarProceso(ps)
+                    if asignado:
+                        ps.estado = LISTO
+                        self.planificador.agregarProceso(ps)
+                        self.planificador.cola_de_suspendidos.remove(ps)
+                        print(f"🟢 Proceso {ps.id} reactivado en t={tiempo_actual} (memoria libre, GM={activos+1}).")
+                        activos += 1
+                else:
+                    break  # No reactivar más suspendidos si ya alcanzó 5
+
+            # 3️⃣ Seleccionar proceso para ejecutar
+            if not self.cpu.proceso and self.planificador.cola_de_listos:
+                self.cpu.proceso = self.planificador.cola_de_listos.pop(0)
+                self.cpu.proceso.estado = EJECUCION
+                print(f"⚙️ t={tiempo_actual}: CPU toma P{self.cpu.proceso.id} para ejecutar.")
+
+            # 4️⃣ Expropiación dinámica (SRTF)
+            if self.cpu.proceso and self.planificador.cola_de_listos:
+                candidato = self.planificador.cola_de_listos[0]
+                if candidato.t_irrupcion_faltante < self.cpu.proceso.t_irrupcion_faltante:
+                    print(f"⚠️ Expropiación: P{candidato.id} tiene menor tiempo restante que P{self.cpu.proceso.id}")
+                    self.cpu.proceso.estado = LISTO
+                    self.planificador.agregarProceso(self.cpu.proceso)
+                    self.cpu.proceso = self.planificador.cola_de_listos.pop(0)
+                    self.cpu.proceso.estado = EJECUCION
+
+            # 5️⃣ Ejecutar CPU
+            if self.cpu.proceso:
+                self.cpu.proceso.t_irrupcion_faltante -= 1
+                if self.cpu.proceso.t_irrupcion_faltante <= 0:
+                    self.cpu.proceso.estado = TERMINADO
+                    self.cpu.proceso.t_final = tiempo_actual + 1
+                    self.memoria.liberarParticion(self.cpu.proceso)
+                    print(f"\n🔴 t={tiempo_actual + 1}: P{self.cpu.proceso.id} terminó ejecución.")
+                    self.cpu.proceso = None
+                    self.mostrar_estado(tiempo_actual + 1)
+                    input("\n Presione ENTER para continuar...\n")
+
+            tiempo_actual += 1
+
+
+    def mostrar_estado(self, tiempo):
+        print(f"\n📋 ESTADO DEL SISTEMA (t={tiempo})")
+
+        if self.cpu.proceso:
+            print(f"🖥️ CPU: ejecutando P{self.cpu.proceso.id} (restante={self.cpu.proceso.t_irrupcion_faltante})")
+        else:
+            print("🖥️ CPU: libre")
+
+        # Tabla de memoria
+        data = []
+        for p in self.memoria.particiones:
+            if isinstance(p.proceso, Proceso):
+                data.append([p.id, f"{p.tamaño}K", f"P{p.proceso.id}", p.proceso.estado, f"{p.fragmentacion}K"])
+            else:
+                data.append([p.id, f"{p.tamaño}K", "-", "-", f"{p.fragmentacion}K"])
+        print("\n🧠 Tabla de memoria:")
+        print(tabulate(data, headers=["ID", "Tamaño", "Proceso", "Estado", "Fragmentación"], tablefmt="fancy_grid"))
+
+        # Cola de listos
+        tabla_listos = [[p.id, p.t_irrupcion_faltante, p.estado] for p in self.planificador.cola_de_listos]
+        print("\n🟢 Cola de listos:")
+        print(tabulate(tabla_listos, headers=["ID", "Tiempo restante", "Estado"], tablefmt="fancy_grid"))
+
+        # Cola suspendidos
+        tabla_susp = [[p.id, p.tamaño, p.estado] for p in self.planificador.cola_de_suspendidos]
+        print("\n💤 Cola suspendidos:")
+        print(tabulate(tabla_susp, headers=["ID", "Tamaño", "Estado"], tablefmt="fancy_grid"))
+
+        # Grado de multiprogramación
+        activos = len([x for x in self.todos_los_procesos if x.estado not in (TERMINADO, NUEVO)])
+        print(f"\n📊 Grado de multiprogramación actual: {activos}/{self.grado_multiprogramacion}")
+
+    def mostrar_informe_final(self, tiempo_final):
+        print("\n📊 INFORME FINAL DE LA SIMULACIÓN\n")
+
+        data = []
+        total_retorno = 0
+        total_espera = 0
+
+        for p in self.procesos_terminados:
+            t_retorno = p.t_final - p.t_arribo
+            t_espera = t_retorno - p.t_irrupcion
+            total_retorno += t_retorno
+            total_espera += t_espera
+            data.append([p.id, p.t_arribo, p.t_irrupcion, p.t_final, t_retorno, t_espera])
+
+        prom_retorno = total_retorno / len(self.procesos_terminados)
+        prom_espera = total_espera / len(self.procesos_terminados)
+        rendimiento = len(self.procesos_terminados) / tiempo_final
+
+        print(tabulate(data, headers=["ID", "Arribo", "Irrupción", "Final", "Retorno", "Espera"], tablefmt="fancy_grid"))
+        print(f"\n📈 Tiempo medio de retorno: {prom_retorno:.2f}")
+        print(f"📉 Tiempo medio de espera: {prom_espera:.2f}")
+        print(f"⚙️ Rendimiento del sistema: {rendimiento:.3f} procesos/unidad de tiempo")
+
+def leer_procesos(ruta_archivo):
+    """
+    Lee los procesos desde un archivo de texto.
+    Cada línea debe tener el formato:
+        id, tamaño, tiempo_arribo, tiempo_irrupcion
+
+    Ejemplo:
+        1,60,0,8
+        2,140,0,1
+        3,40,10,10
+        4,30,10,10
+        5,85,10,2
+    """
+    procesos = []
+
+    try:
+        with open(ruta_archivo, "r") as f:
+            for linea in f:
+                linea = linea.strip()
+                if not linea or linea.startswith("#"):
+                    continue  # ignorar líneas vacías o comentarios
+
+                partes = linea.split(",")
+                if len(partes) != 4:
+                    print(f"⚠️  Línea ignorada (formato incorrecto): {linea}")
+                    continue
+
+                id_p, tam, t_arribo, t_irrupcion = map(int, partes)
+                procesos.append(Proceso(id_p, tam, t_irrupcion, t_arribo))
+
+        procesos.sort(key=lambda p: p.t_arribo)
+        print(f"\n📥 Se cargaron {len(procesos)} procesos desde '{ruta_archivo}' correctamente.\n")
+        return procesos
+
+    except FileNotFoundError:
+        print(f"❌ No se encontró el archivo '{ruta_archivo}'.")
+        return []

@@ -8,7 +8,9 @@ class Simulador:
         self.planificador = Planificador()
         self.procesos_terminados = []
         self.todos_los_procesos = []
+        self.multiprogramacion = 0
 
+    
     # -----------------------------------------------------
     # Carga inicial de procesos desde lista o archivo
     # -----------------------------------------------------
@@ -27,24 +29,28 @@ class Simulador:
 
         while True:
             # 1️⃣ Arribo de nuevos procesos
-            llegaron = [p for p in procesos_en_espera if p.t_arribo == tiempo_actual]
-            for p in llegaron:
-                procesos_en_espera.remove(p)
-                p.estado = NUEVO
-                print(f"\n🕐 t={tiempo_actual}: Proceso {p.id} arriba (tamaño={p.tamaño}K, irrupción={p.t_irrupcion})")
+            if self.multiprogramacion < 5:
+                llegaron = [p for p in procesos_en_espera if p.t_arribo == tiempo_actual]
+                for p in llegaron:
+                    procesos_en_espera.remove(p)
+                    #p.estado = NUEVO
+                    print(f"\n🕐 t={tiempo_actual}: Proceso {p.id} arriba (tamaño={p.tamaño}K, irrupción={p.t_irrupcion})")
 
-                asignado = self.memoria.asignarProceso(p)
-                if asignado:
-                    self.planificador.agregarProceso(p)
-                    print(f"🟢 Proceso {p.id} cargado en memoria y listo para ejecutar.")
-                else:
-                    p.estado = SUSPENDIDO
-                    self.planificador.cola_de_suspendidos.append(p)
-                    print(f"💤 Proceso {p.id} suspendido (sin espacio en memoria).")
+                    asignado = self.memoria.asignarProceso(p)
+                    if asignado:
+                        self.planificador.agregarProceso(p)
+                        print(f"🟢 Proceso {p.id} cargado en memoria y listo para ejecutar.")
+                    else:
+                        p.estado = SUSPENDIDO
+                        self.planificador.cola_de_suspendidos.append(p)
+                        print(f"💤 Proceso {p.id} suspendido (sin espacio en memoria).")
 
-                # 🔹 Mostrar estado cuando llega un proceso nuevo
-                self.mostrar_estado(tiempo_actual)
-                input("\n Presione ENTER para continuar...\n")
+                    # 🔹 Mostrar estado cuando llega un proceso nuevo
+                    self.multiprogramacion += 1
+                    self.mostrar_estado(tiempo_actual)
+                    input("\n Presione ENTER para continuar...\n")
+                
+              
 
             # 2️⃣ Reactivar suspendidos si hay memoria libre
             for ps in list(self.planificador.cola_de_suspendidos):
@@ -84,6 +90,8 @@ class Simulador:
                     self.procesos_terminados.append(self.cpu.proceso)
                     print(f"\n🔴 t={tiempo_actual + 1}: P{self.cpu.proceso.id} terminó ejecución.")
                     self.memoria.liberarParticion(self.cpu.proceso)
+                    self.multiprogramacion -= 1
+                    print("Se decremento por P terminado")
                     self.mostrar_estado(tiempo_actual + 1)
                     input("\n⏸️ Presione ENTER para continuar...\n")
                     self.cpu.proceso = None
@@ -104,7 +112,10 @@ class Simulador:
         print(f"\n📋 ESTADO DEL SISTEMA")
 
         if self.cpu.proceso:
-            print(f"🖥️ CPU: ejecutando P{self.cpu.proceso.id} (restante={self.cpu.proceso.t_irrupcion_faltante})")
+            if self.cpu.proceso.t_irrupcion_faltante > 0:
+                print(f"🖥️ CPU: ejecutando P{self.cpu.proceso.id} (restante={self.cpu.proceso.t_irrupcion_faltante})")
+            else: 
+                print("🖥️ CPU: libre")
         else:
             print("🖥️ CPU: libre")
 
@@ -128,6 +139,8 @@ class Simulador:
         tabla_susp = [[p.id, p.tamaño, p.estado] for p in self.planificador.cola_de_suspendidos]
         print("\n Cola suspendidos:")
         print(tabulate(tabla_susp, headers=["ID", "Tamaño", "Estado"], tablefmt="fancy_grid"))
+
+        print(f"El grado de multiprogramacion es: {self.multiprogramacion}\n")
 
 
     # -----------------------------------------------------

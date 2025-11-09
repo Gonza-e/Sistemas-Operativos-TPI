@@ -1,5 +1,5 @@
 LISTO = 'Ready'
-SUSPENDIDO = 'Suspended'
+SUSPENDIDO = 'Ready/Suspended'
 EJECUCION = 'Running'
 NUEVO = 'New'
 TERMINADO = 'Exit'
@@ -20,7 +20,7 @@ class Proceso:
         self.tamaño = tam 
         self.estado = NUEVO
         self.t_arribo = ta
-        self.t_irrupcion = ti
+        self.t_irrupcion = ti #Eliminar este atributo y reemplazarlo por el t_irrupcion_faltante
         self.t_irrupcion_faltante = ti 
         self.t_retorno = 0
         self.t_espera = 0
@@ -70,6 +70,7 @@ class Planificador:
     def __init__(self):
         self.cola_de_listos = []
         self.cola_de_suspendidos = []
+       # self.cola_de_listossuspendidos = []
         self.tiempo = 0         #Tiempo global
     
     def agregarProceso(self,proceso):
@@ -81,6 +82,3 @@ class Planificador:
             return self.cola_de_listos[0]        #Selecciona el primer proceso de la cola de listos
         else:
             return None
-
-
-

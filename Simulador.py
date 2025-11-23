@@ -8,8 +8,10 @@ class Simulador:
         self.cpu = CPU()
         self.planificador = Planificador()
         self.procesos_terminados = []
+        self.cola_nuevos = []
         self.todos_los_procesos = []
         self.multiprogramacion = 0
+        self.limiteProcesos = 10
 
     
     # -----------------------------------------------------
@@ -24,19 +26,28 @@ class Simulador:
     # -----------------------------------------------------
     def ejecutar(self):
         tiempo_actual = 0
-        procesos_en_espera = self.todos_los_procesos.copy()
+
+        # Con este bucle verificamos que solo entren hasta 10 procesos como maximo y que tambien 
+        # solamente entren aquellos procesos que tengan un tamaño menor o igual al de la particion mas grande
+        procesos_en_espera = []
+        for pn in self.todos_los_procesos:
+            if self.limiteProcesos > 0 and pn.tamaño <= 250:
+                procesos_en_espera.append(pn)
+                self.limiteProcesos -= 1
 
         print("\n🚀 INICIO DE LA SIMULACIÓN\n")
 
         while True:
             # 1️⃣ Arribo de nuevos procesos
-            if self.multiprogramacion < 5:
-                llegaron = [p for p in procesos_en_espera if p.t_arribo == tiempo_actual]
-                for p in llegaron:
-                    procesos_en_espera.remove(p)
-                    #p.estado = NUEVO
-                    print(f"\n🕐 t={tiempo_actual}: Proceso {p.id} arriba (tamaño={p.tamaño}K, irrupción={p.t_irrupcion})")
+            print(f"\n __________________________ t = {tiempo_actual} ___________________________")
+            nuevos = [p for p in procesos_en_espera if p.t_arribo == tiempo_actual]
+            for p in nuevos:
+                self.limiteProcesos -= 1
+                procesos_en_espera.remove(p)
+                print(f"\n🕐 t={tiempo_actual}: Proceso {p.id} arriba (tamaño={p.tamaño}K, irrupción={p.t_irrupcion})")
 
+                # Si hay espacio en el grado de multiprogramación
+                if self.multiprogramacion < 5:
                     asignado = self.memoria.asignarProceso(p)
                     if asignado:
                         self.planificador.agregarProceso(p)
@@ -46,11 +57,16 @@ class Simulador:
                         self.planificador.cola_de_suspendidos.append(p)
                         print(f"💤 Proceso {p.id} suspendido (sin espacio en memoria).")
 
-                    # 🔹 Mostrar estado cuando llega un proceso nuevo
                     self.multiprogramacion += 1
-                    self.mostrar_estado(tiempo_actual)
-                    input("\n Presione ENTER para continuar...\n")
-              
+                else:
+                    # MULTIPROGRAMACIÓN LLENA → pasa a COLA DE NUEVOS
+                    p.estado = "NUEVO"
+                    self.cola_nuevos.append(p)
+                    print(f"⏳ P{p.id} enviado a COLA NUEVOS (multiprogramación llena).")
+
+                self.mostrar_estado(tiempo_actual)
+                input("\n Presione ENTER para continuar...\n")
+
 
             # 2️⃣ Reactivar suspendidos si hay memoria libre
             for ps in list(self.planificador.cola_de_suspendidos):
@@ -61,6 +77,23 @@ class Simulador:
                         self.planificador.agregarProceso(ps)
                         self.planificador.cola_de_suspendidos.remove(ps)
                         print(f"🟢 Proceso {ps.id} reactivado (memoria disponible en t={tiempo_actual}).")
+
+            # 🔄 Admitir solo UN proceso desde COLA NUEVOS si hay espacio
+            if self.multiprogramacion < 5 and self.cola_nuevos:
+
+                candidato = self.cola_nuevos[0]  # solo mirar el primero
+
+                asignado = self.memoria.asignarProceso(candidato)
+
+                if asignado:
+                    candidato.estado = LISTO
+                    self.planificador.agregarProceso(candidato)
+                    self.cola_nuevos.pop(0)
+                    self.multiprogramacion += 1
+                    print(f"🟢 P{candidato.id} admitido desde COLA NUEVOS")
+                else:
+                    # No intentamos con otros nuevos hasta que cambie la memoria
+                    pass
 
             # 3️⃣ Seleccionar proceso según SRTF
             if self.cpu.proceso is None and self.planificador.cola_de_listos:
@@ -90,9 +123,10 @@ class Simulador:
                     self.procesos_terminados.append(self.cpu.proceso)
                     print(f"\n🔴 t={tiempo_actual + 1}: P{self.cpu.proceso.id} terminó ejecución.")
                     self.memoria.liberarParticion(self.cpu.proceso)
-                    self.mostrar_estado(tiempo_actual + 1)
+                #    self.mostrar_estado(tiempo_actual + 1)
                     self.multiprogramacion -= 1
                     print("Se decremento por P terminado")
+                    self.mostrar_estado(tiempo_actual + 1)
                     input("\n⏸️ Presione ENTER para continuar...\n")
                     self.cpu.proceso = None
 
@@ -108,7 +142,7 @@ class Simulador:
     # Muestra el estado actual del sistema
     # -----------------------------------------------------
     def mostrar_estado(self, tiempo):
-        print(f"\n __________________________ t = {tiempo} ___________________________")
+    #    print(f"\n __________________________ t = {tiempo} ___________________________")
         print(f"\n📋 ESTADO DEL SISTEMA")
 
         if self.cpu.proceso:
@@ -133,6 +167,11 @@ class Simulador:
         tabla_listos = [[p.id, p.t_irrupcion_faltante, p.estado] for p in self.planificador.cola_de_listos]
         print("\n Cola de listos:")
         print(tabulate(tabla_listos, headers=["ID", "Tiempo restante", "Estado"], tablefmt="fancy_grid"))
+
+        # Cola de nuevos
+        tabla_nuevos = [[p.id, p.t_arribo, p.estado] for p in self.cola_nuevos]
+        print("\n Cola de nuevos:")
+        print(tabulate(tabla_nuevos, headers=["ID", "Arribo", "Estado"], tablefmt="fancy_grid"))
 
         tabla_susp = [[p.id, p.tamaño, p.estado] for p in self.planificador.cola_de_suspendidos]
         print("\n Cola suspendidos:")

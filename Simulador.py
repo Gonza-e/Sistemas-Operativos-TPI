@@ -1,5 +1,7 @@
 from Clases import *
 from tabulate import tabulate
+from tkinter import filedialog
+import tkinter as tk
 import csv
 
 class Simulador:
@@ -207,7 +209,21 @@ class Simulador:
         print(f"⚙️  Rendimiento del sistema: {rendimiento:.3f} procesos/unidad de tiempo")
 
 
-def leer_procesos(ruta_archivo):
+def leer_procesos(ruta_archivo=None):
+
+    # === Abrir selector de archivos si no se pasa ruta ===
+    if ruta_archivo is None:
+        root = tk.Tk()
+        root.withdraw()  # Oculta la ventana principal
+        
+        ruta_archivo = filedialog.askopenfilename(
+            title="Seleccionar archivo CSV de procesos",
+            filetypes=[("Archivos CSV", "*.csv"), ("Todos los archivos", "*.*")]
+        )
+
+        if not ruta_archivo:
+            print("❌ No se seleccionó ningún archivo.")
+            return []
 
     procesos = []
 
@@ -216,16 +232,13 @@ def leer_procesos(ruta_archivo):
             lector = csv.reader(f)
 
             for fila in lector:
-                # Ignorar líneas vacías
                 if not fila or all(campo.strip() == "" for campo in fila):
                     continue
 
-                # Permitir comentarios estilo "# ..."
                 linea_original = ",".join(fila)
                 if linea_original.strip().startswith("#"):
                     continue
 
-                # Validar cantidad correcta de columnas
                 if len(fila) != 4:
                     print(f"⚠️  Línea ignorada (formato incorrecto): {fila}")
                     continue

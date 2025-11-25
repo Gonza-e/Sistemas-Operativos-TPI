@@ -1,7 +1,7 @@
 from Simulador import Simulador, leer_procesos
 
 if __name__ == "__main__":
-    procesos = leer_procesos("procesos.csv")
+    procesos = leer_procesos()   # ← ahora abre el explorador
 
     if not procesos:
         print("No hay procesos para simular.")
@@ -10,3 +10,4 @@ if __name__ == "__main__":
         sim.cargarProcesos(procesos)
         sim.ejecutar()
 
+input("Presione cualquier tecla para finalizar la ejecucion \n")

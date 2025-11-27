@@ -1,5 +1,7 @@
 from Clases import *
 from tabulate import tabulate
+from tkinter import filedialog
+import tkinter as tk
 import csv
 
 class Simulador:
@@ -35,16 +37,16 @@ class Simulador:
                 for p in llegaron:
                     procesos_en_espera.remove(p)
                     #p.estado = NUEVO
-                    print(f"\n🕐 t={tiempo_actual}: Proceso {p.id} arriba (tamaño={p.tamaño}K, irrupción={p.t_irrupcion})")
+                    print(f"\n>>> t={tiempo_actual}: Proceso {p.id} arriba (tamaño={p.tamaño}K, irrupción={p.t_irrupcion})")
 
                     asignado = self.memoria.asignarProceso(p)
                     if asignado:
                         self.planificador.agregarProceso(p)
-                        print(f"🟢 Proceso {p.id} cargado en memoria y listo para ejecutar.")
+                        print(f">> Proceso {p.id} cargado en memoria y listo para ejecutar.")
                     else:
                         p.estado = SUSPENDIDO
                         self.planificador.cola_de_suspendidos.append(p)
-                        print(f"💤 Proceso {p.id} suspendido (sin espacio en memoria).")
+                        print(f">> Proceso {p.id} suspendido (sin espacio en memoria).")
 
                     # 🔹 Mostrar estado cuando llega un proceso nuevo
                     self.multiprogramacion += 1
@@ -60,20 +62,20 @@ class Simulador:
                         ps.estado = LISTO
                         self.planificador.agregarProceso(ps)
                         self.planificador.cola_de_suspendidos.remove(ps)
-                        print(f"🟢 Proceso {ps.id} reactivado (memoria disponible en t={tiempo_actual}).")
+                        print(f">> Proceso {ps.id} reactivado (memoria disponible en t={tiempo_actual}).")
 
             # 3️⃣ Seleccionar proceso según SRTF
             if self.cpu.proceso is None and self.planificador.cola_de_listos:
                 self.cpu.proceso = self.planificador.cola_de_listos.pop(0)
                 self.cpu.proceso.estado = EJECUCION
-                print(f"⚙️ t={tiempo_actual}: CPU toma P{self.cpu.proceso.id} para ejecutar.")
+                print(f">>> t={tiempo_actual}: CPU toma P{self.cpu.proceso.id} para ejecutar.")
 
             # Revision 
             # 4️⃣ Expropiación SRTF
             if self.cpu.proceso and self.planificador.cola_de_listos:
                 candidato = self.planificador.cola_de_listos[0]
                 if candidato.t_irrupcion_faltante < self.cpu.proceso.t_irrupcion_faltante:
-                    print(f"⚠️ Expropiación: P{candidato.id} tiene menor tiempo restante que P{self.cpu.proceso.id}")
+                    print(f">>> Expropiación: P{candidato.id} tiene menor tiempo restante que P{self.cpu.proceso.id}")
                     self.cpu.proceso.estado = LISTO
                     self.planificador.agregarProceso(self.cpu.proceso)
                     self.cpu.proceso = self.planificador.cola_de_listos.pop(0)
@@ -88,17 +90,17 @@ class Simulador:
                     self.cpu.proceso.estado = TERMINADO
                     self.cpu.proceso.t_final = tiempo_actual + 1
                     self.procesos_terminados.append(self.cpu.proceso)
-                    print(f"\n🔴 t={tiempo_actual + 1}: P{self.cpu.proceso.id} terminó ejecución.")
+                    print(f"\n>>> t={tiempo_actual + 1}: P{self.cpu.proceso.id} terminó ejecución.")
                     self.memoria.liberarParticion(self.cpu.proceso)
                     self.mostrar_estado(tiempo_actual + 1)
                     self.multiprogramacion -= 1
                     print("Se decremento por P terminado")
-                    input("\n⏸️ Presione ENTER para continuar...\n")
+                    input("\nPresione ENTER para continuar...\n")
                     self.cpu.proceso = None
 
             # 6️⃣ Condición de fin (no quedan procesos activos)
             if (not procesos_en_espera and not self.planificador.cola_de_listos and not self.planificador.cola_de_suspendidos and not self.cpu.proceso):
-                print("\n✅ SIMULACIÓN FINALIZADA.")
+                print("\n>>>> SIMULACIÓN FINALIZADA.")
                 self.mostrar_informe_final(tiempo_actual)
                 break
 
@@ -108,7 +110,7 @@ class Simulador:
     # Muestra el estado actual del sistema
     # -----------------------------------------------------
     def mostrar_estado(self, tiempo):
-        print(f"\n __________________________ t = {tiempo} ___________________________")
+    #    print(f"\n __________________________ t = {tiempo} ___________________________")
         print(f"\n📋 ESTADO DEL SISTEMA")
 
         if self.cpu.proceso:
@@ -168,7 +170,33 @@ class Simulador:
         print(f"⚙️  Rendimiento del sistema: {rendimiento:.3f} procesos/unidad de tiempo")
 
 
-def leer_procesos(ruta_archivo):
+def leer_procesos(ruta_archivo=None):
+
+    # === Mensaje de bienvenida antes de abrir el explorador ===
+    print("==========================================")
+    print("         SIMULADOR DE PROCESOS")
+    print("==========================================")
+    print("El siguiente trabajo simula el acceso de procesos a la memoria")
+    print("principal, su ejecución con planificación SRTF, y el comportamiento")
+    print("de las distintas colas del sistema:")
+    print("  • Nuevos")
+    print("  • Listos")
+    print("  • Listo/Suspendido")
+    print("Seleccione el archivo CSV con los procesos\n")
+
+    # Si no se pasa una ruta, abrir file dialog
+    if ruta_archivo is None:
+        root = tk.Tk()
+        root.withdraw()
+
+        ruta_archivo = filedialog.askopenfilename(
+            title="Seleccionar archivo CSV de procesos",
+            filetypes=[("Archivos CSV", "*.csv"), ("Todos los archivos", "*.*")]
+        )
+
+        if not ruta_archivo:
+            print("No se selecciono ningun archivo.")
+            return []
 
     procesos = []
 
@@ -177,16 +205,13 @@ def leer_procesos(ruta_archivo):
             lector = csv.reader(f)
 
             for fila in lector:
-                # Ignorar líneas vacías
                 if not fila or all(campo.strip() == "" for campo in fila):
                     continue
 
-                # Permitir comentarios estilo "# ..."
                 linea_original = ",".join(fila)
                 if linea_original.strip().startswith("#"):
                     continue
 
-                # Validar cantidad correcta de columnas
                 if len(fila) != 4:
                     print(f"⚠️  Línea ignorada (formato incorrecto): {fila}")
                     continue

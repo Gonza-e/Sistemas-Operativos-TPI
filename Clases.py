@@ -4,7 +4,7 @@ EJECUCION = 'Running'
 NUEVO = 'New'
 TERMINADO = 'Exit'
 
-#Clase para las particiones
+# Clase para las particiones
 class Particion:
     def __init__(self,id,tam,dir,proc = None):
         self.id = id 
@@ -13,29 +13,29 @@ class Particion:
         self.proceso = proc
         self.fragmentacion = tam 
 
-#Clase para los procesos
+# Clase para los procesos
 class Proceso:
     def __init__(self,id,tam,ti,ta):
         self.id = id 
         self.tamaño = tam 
         self.estado = NUEVO
         self.t_arribo = ta
-        self.t_irrupcion = ti #Eliminar este atributo y reemplazarlo por el t_irrupcion_faltante
+        self.t_irrupcion = ti # Eliminar este atributo y reemplazarlo por el t_irrupcion_faltante
         self.t_irrupcion_faltante = ti 
         self.t_retorno = 0
         self.t_espera = 0
         self.t_final = 0
 
-#Clase para la CPU       
+# Clase para la CPU       
 class CPU:
     def __init__(self):
         self.proceso = None 
 
-#Clase para la memoria
+# Clase para la memoria
 class Memoria: 
     def __init__(self):
         self.particiones = [ 
-            Particion(0,100,0,"SO"),        #Particion para el sistema operativo
+            Particion(0,100,0,"SO"),        # Particion para el sistema operativo
             Particion(1,250,100,None),
             Particion(2,150,350,None),
             Particion(3,50,500,None)
@@ -44,12 +44,13 @@ class Memoria:
     def asignarProceso(self, proceso):
         mejor = None
 
+        # Asignacion Best-fit
         for p in self.particiones:
-            if p.proceso is None and proceso.tamaño <= p.tamaño:
-                if mejor is None or (p.tamaño - proceso.tamaño) < (mejor.tamaño - proceso.tamaño):
+            if p.proceso is None and proceso.tamaño <= p.tamaño:    
+                if mejor is None or (p.tamaño - proceso.tamaño) < (mejor.tamaño - proceso.tamaño):  # Se compara la fragmentacion interna
                     mejor = p
 
-        #Si encontró partición, asignar proceso
+        # Si encontro particion, asignar proceso
         if mejor:
             mejor.proceso = proceso
             mejor.fragmentacion = mejor.tamaño - proceso.tamaño
@@ -65,20 +66,19 @@ class Memoria:
                 p.fragmentacion = p.tamaño
                 break
 
-#Clase para el Planificador SRTF
+# Clase para el Planificador SRTF
 class Planificador:    
     def __init__(self):
         self.cola_de_listos = []
         self.cola_de_suspendidos = []
-       # self.cola_de_listossuspendidos = []
-        self.tiempo = 0         #Tiempo global
+        self.tiempo = 0     # Tiempo global
     
     def agregarProceso(self,proceso):
         self.cola_de_listos.append(proceso)
-        self.cola_de_listos.sort(key=lambda p: p.t_irrupcion_faltante)      #Ordena la cola de listos segun el tiempo de irrupcion faltante
+        self.cola_de_listos.sort(key=lambda p: p.t_irrupcion_faltante)  # Ordena la cola de listos segun el tiempo de irrupcion faltante
         
     def siguienteProceso(self):
         if self.cola_de_listos:
-            return self.cola_de_listos[0]        #Selecciona el primer proceso de la cola de listos
+            return self.cola_de_listos[0]   # Selecciona el primer proceso de la cola de listos
         else:
             return None

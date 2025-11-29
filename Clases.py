@@ -66,19 +66,12 @@ class Memoria:
                 p.fragmentacion = p.tamaño
                 break
 
-# Clase para el Planificador SRTF
+# Clase para el Planificador SRTF, se encuentra el metodo para agregar un proceso a la cola de listos
 class Planificador:    
     def __init__(self):
         self.cola_de_listos = []
         self.cola_de_suspendidos = []
-        self.tiempo = 0     # Tiempo global
     
     def agregarProceso(self,proceso):
         self.cola_de_listos.append(proceso)
         self.cola_de_listos.sort(key=lambda p: p.t_irrupcion_faltante)  # Ordena la cola de listos segun el tiempo de irrupcion faltante
-        
-    def siguienteProceso(self):
-        if self.cola_de_listos:
-            return self.cola_de_listos[0]   # Selecciona el primer proceso de la cola de listos
-        else:
-            return None

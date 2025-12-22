@@ -47,6 +47,7 @@ class Simulador:
                     asignado = self.memoria.asignarProceso(p)
                     if asignado:
                         self.planificador.agregarProceso(p)
+                        p.t_arribo_efectivo = tiempo_actual # Asigno el tiempo en el que arribo a la cola de listos
                         print(f">> Proceso {p.id} cargado en memoria y listo para ejecutar.")
                     else:
                         p.estado = SUSPENDIDO
@@ -71,6 +72,7 @@ class Simulador:
                     if asignado:
                         ps.estado = LISTO
                         self.planificador.agregarProceso(ps)
+                        ps.t_arribo_efectivo = tiempo_actual # Asigno el tiempo en el que arribo a la cola de listos
                         self.planificador.cola_de_suspendidos.remove(ps)
                         print(f">> Proceso {ps.id} reactivado (memoria disponible en t={tiempo_actual}).")
 
@@ -85,6 +87,7 @@ class Simulador:
                     # Entró en memoria, entonces pasa a LISTOS
                     candidato.estado = LISTO
                     self.planificador.agregarProceso(candidato)
+                    candidato.t_arribo_efectivo = tiempo_actual # Asigno el tiempo en el que arribo a la cola de listos
                     self.multiprogramacion += 1
                     print(f">> {candidato.id} admitido desde COLA DE NUEVOS")
                 else:
@@ -110,6 +113,7 @@ class Simulador:
                     self.planificador.agregarProceso(self.cpu.proceso)
                     self.cpu.proceso = self.planificador.cola_de_listos.pop(0)
                     self.cpu.proceso.estado = EJECUCION
+                    self.cpu.proceso.t_arribo_efectivo = tiempo_actual # Asigno el tiempo de arribo a la cola de listos
 
             # Ejecutar una unidad de CPU
             if self.cpu.proceso:
@@ -187,11 +191,11 @@ class Simulador:
         total_espera = 0
 
         for p in self.procesos_terminados:
-            t_retorno = p.t_final - p.t_arribo
+            t_retorno = p.t_final - p.t_arribo_efectivo
             t_espera = t_retorno - p.t_irrupcion
             total_retorno += t_retorno
             total_espera += t_espera
-            data.append([p.id, p.t_arribo, p.t_irrupcion, p.t_final, t_retorno, t_espera])
+            data.append([p.id, p.t_arribo, p.t_arribo_efectivo, p.t_irrupcion, p.t_final, t_retorno, t_espera])
 
         # Tiempos de espera y retorno promedios
         prom_retorno = total_retorno / len(self.procesos_terminados)
@@ -199,7 +203,7 @@ class Simulador:
         rendimiento = len(self.procesos_terminados) / tiempo_final
 
         # Generacion de la tabla para mostrar el informe final
-        print(tabulate(data, headers=["ID", "Arribo", "Irrupción", "Final", "Retorno", "Espera"], tablefmt="fancy_grid"))
+        print(tabulate(data, headers=["ID", "Arribo", "Arribo efectivo", "Irrupción", "Final", "Retorno", "Espera"], tablefmt="fancy_grid"))
         print(f"\nTiempo medio de retorno: {prom_retorno:.2f}")
         print(f"Tiempo medio de espera: {prom_espera:.2f}")
         print(f"Rendimiento del sistema: {rendimiento:.3f} procesos/unidad de tiempo")

@@ -19,8 +19,9 @@ class Proceso:
         self.id = id 
         self.tamaño = tam 
         self.estado = NUEVO
-        self.t_arribo = ta
-        self.t_irrupcion = ti # Eliminar este atributo y reemplazarlo por el t_irrupcion_faltante
+        self.t_arribo = ta # Tiempo de arribo al sistema 
+        self.t_arribo_efectivo = 0 # Tiempo de arribo a la cola de listos
+        self.t_irrupcion = ti
         self.t_irrupcion_faltante = ti 
         self.t_retorno = 0
         self.t_espera = 0
